@@ -2,6 +2,7 @@
 #include <string.h>
 #include <omp.h>
 #include <unistd.h>
+#include <algorithm>
 
 #include <rpc/rpc.h>
 
@@ -13,14 +14,17 @@ using namespace std;
 
 CLIENT *c1;
 CLIENT *c2;
-// INPUT int;
+
+struct INPUT {
+  int F,N,L,M;
+  char c0, c1, c2;
+} st;
+
 
 bool static stringLengthMaxed = false;
 char alphabet[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-int counter = 0;
 
 void update(server_letter xdrmessage, int thread_id) {
-
   if (*rpc_append_1(&xdrmessage, c1) == 0) {
     cout << thread_id << " : added" << endl;
   } else if (*rpc_append_1(&xdrmessage, c1) == -1) {
@@ -53,13 +57,7 @@ void RPC_InitAppendServer (int argc, char *argv[]) {
   char *server;
   char **sresult;
 
-
-  // if (argc !=2){
-  //   cerr <<"usage:" << argv[0] <<" hostname\n";
-  //   exit(1);
-  // }
   cout << argv[8] << endl;
-
   server = argv[8];
 
   if ((c1 = clnt_create(server, APPEND_PROG, APPEND_VERS, "udp")) == NULL){
@@ -67,31 +65,22 @@ void RPC_InitAppendServer (int argc, char *argv[]) {
     exit(2);
   }
 
-  server_appendxdr xdrmessage; //structure appendxdr defined in appendxdr.x
-
-  // long temp_long = 1;
-  // char *temp_str = (char*)"Client is testing";
+  server_appendxdr xdrmessage;
   
-  //initialize xdrmessage
-  int N = strtol(argv[2], NULL, 10);
-  xdrmessage.F = strtol(argv[1], NULL, 10);
-  xdrmessage.L = strtol(argv[3], NULL, 10);
-  xdrmessage.M = strtol(argv[4], NULL, 10);
-  xdrmessage.c0 = argv[5][0];
-  xdrmessage.c1 = argv[6][0];
-  xdrmessage.c2 = argv[7][0];
+  xdrmessage.F = st.F;
+  xdrmessage.L = st.L;
+  xdrmessage.M = st.M;
+  xdrmessage.c0 = st.c0;
+  xdrmessage.c1 = st.c1;
+  xdrmessage.c2 = st.c2;
   
   if ((sresult = rpc_initappendserver_1(&xdrmessage, c1)) == NULL){
     clnt_perror(c1, server);
     exit(4);
   }
-
-  // cout << "Client call server successfully\n ";
-  // cout << "Server send message back:\n " << server << " = " <<*sresult<<"\n";
   
-  #pragma omp parallel num_threads(N)
+  #pragma omp parallel num_threads(st.N)
   RPCAppend();
-
 }
 
 void RPC_InitVerifyServer (int argc, char *argv[]) {
@@ -106,61 +95,86 @@ void RPC_InitVerifyServer (int argc, char *argv[]) {
   }
 
   server_verifyxdr xdrmessage;
-  xdrmessage.N = strtol(argv[2], NULL, 10);
-  xdrmessage.L = strtol(argv[3], NULL, 10);
-  xdrmessage.M = strtol(argv[4], NULL, 10);
+  xdrmessage.N = st.N;
+  xdrmessage.L = st.L;
+  xdrmessage.M = st.M;
 
   if ((sresult = rpc_initverifyserver_1(&xdrmessage, c2)) == NULL){
     clnt_perror(c2, server);
     exit(4);
   }
-
 }
 
-void checkSegmentProp(int N) {
-  char **sresult;
+bool verify(string str) {
+  size_t occurOfC0 = count(str.begin(), str.end(), st.c0);
+  size_t occurOfC1 = count(str.begin(), str.end(), st.c1);
+  size_t occurOfC2 = count(str.begin(), str.end(), st.c2);
+
+  switch (st.F) {
+    case 0:
+      if (occurOfC0 + occurOfC1 == occurOfC2)
+        return(true);
+      break;
+    case 1:
+      if (occurOfC0 + (2 * occurOfC1) == occurOfC2)
+        return(true);
+      break;
+    case 2:
+      if (occurOfC0 * occurOfC1 == occurOfC2)
+        return(true);
+      break;
+    case 3:
+      if (occurOfC0 - occurOfC1 == occurOfC2) 
+        return(true);
+      break;
+   }  
+   return(false);
+}   
+
+int checkSegmentProp() {
+  string sresult;
   int thread_id = omp_get_thread_num();
-  // char *seg; 
+  int isSatisfied=0;
   server_segment xdrmessage;
   xdrmessage.seg = thread_id;
 
-  while (!sresult=='\0') {
+  while (true) {
     #pragma omp critical
-    sresult = rpc_getseg_1(&xdrmessage, c2);
-    cout << "THREAD: " << thread_id << " SEG" << xdrmessage.seg << " = " << *sresult << "\n";
+    sresult = rpc_getseg_1(&xdrmessage, c2)[0];
+    if (sresult[0]=='-') 
+      break; 
+    else if (verify(sresult)==true) 
+      isSatisfied++; 
 
+    cout << "THREAD: " << thread_id << " SUBTR: " << sresult << " RESULT: " << isSatisfied << "\n";
   }
-
-  // omp_set_lock(&mutex);
-  // if (verifyF(inSt.F, inSt.c0, inSt.c1, inSt.c2, *sresult) == true) {
-  //   numOfSegmentsSatisfied++;
-  // }
-  // omp_unset_lock(&mutex);
-
-
-   // omp_set_lock(&mutex);
-   // if (verifyF(inSt.F, inSt.c0, inSt.c1, inSt.c2, strSeg) == true) {
-   //    numOfSegmentsSatisfied++;
-   // }
-   // omp_unset_lock(&mutex);
-
-   // D(printf("-----THREAD: %i Substr: %s   Satisfied: %i\n", thread_id, strSeg.c_str(), numOfSegmentsSatisfied)); 
+  return (isSatisfied);
 }
 
-void RPC_GetSeg(int N, int M) {
-  #pragma omp parallel num_threads(N)
-  checkSegmentProp(N);
-  counter++;
+void RPC_GetSeg() {
+  int isSatisfied=0;
+  #pragma omp parallel num_threads(st.N) reduction(+:isSatisfied)
+  isSatisfied += checkSegmentProp();
+
+  cout << "---------SEGMENTS SATISFIED: " << isSatisfied << "\n";
    // writeOutputFile();
 }
 
 
 int main(int argc, char *argv[]) {
   cerr <<"-------Program start---------\n";
+  st.F = strtol(argv[1], NULL, 10);
+  st.N = strtol(argv[2], NULL, 10);
+  st.L = strtol(argv[3], NULL, 10);
+  st.M = strtol(argv[4], NULL, 10);
+  st.c0 = argv[5][0];
+  st.c1 = argv[6][0];
+  st.c2 = argv[7][0];
+
 
   RPC_InitVerifyServer(argc, argv);
   RPC_InitAppendServer(argc, argv);
-  RPC_GetSeg(strtol(argv[2], NULL, 10), strtol(argv[4], NULL, 10));
+  RPC_GetSeg();
   clnt_destroy(c1);
   clnt_destroy(c2);
   exit(0);

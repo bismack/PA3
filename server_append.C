@@ -13,26 +13,26 @@ int totalStringLength;
 
   
 char **rpc_initappendserver_1_svc(server_appendxdr *xdrm, struct svc_req *s) {
-    static char *ptr = (char *)"Append server initialized"; /* must be static */
+  static char *ptr = (char *)"Append server initialized"; /* must be static */
 
 	totalStringLength = xdrm->M * xdrm->L;
-    cout << "Message from client: "<< xdrm->c0 << xdrm->c1 << xdrm->c2 << "\n";
+  cout << "Message from client: "<< xdrm->c0 << xdrm->c1 << xdrm->c2 << "\n";
      
-    return(&ptr);
+  return(&ptr);
 }
 
 int *rpc_append_1_svc(server_letter *xdrm, struct svc_req *s) {
-    static int ret=0;
+  static int ret=0;
 
-    if (currStringLength != totalStringLength) {
-		S += xdrm->letter;
-	   	currStringLength++;
-	   	cout << "LETTER: " << xdrm->letter << " | STRING LENGTH IS: " << currStringLength << " | STRING: " << S.c_str() << endl;
-   	} else {
-   		cout << "STRING HAS BEEN COMPLETED: " << S.c_str() << endl;
-      	ret = -1;
-      	return(&ret); 
-   	}
+  if (currStringLength != totalStringLength) {
+	S += xdrm->letter;
+   	currStringLength++;
+   	cout << "LETTER: " << xdrm->letter << " | STRING LENGTH IS: " << currStringLength << " | STRING: " << S.c_str() << endl;
+ 	} else {
+ 		cout << "STRING HAS BEEN COMPLETED: " << S.c_str() << endl;
+    	ret = -1;
+    	return(&ret); 
+ 	}
 
-    return(&ret);
+  return(&ret);
 }

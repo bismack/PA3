@@ -25,27 +25,27 @@ using namespace std;
 
 int N, L, M;
 int counter=0;
-char S[] = {"abcabcabcabcabcabcabcabc"};
-// char S = "abcabcabcabcabcabcabcabc";
+char S[] = {"abcaabcaabcaabcaabca"};
 
 char **rpc_getseg_1_svc(server_segment *xdrm, struct svc_req *s) {
 	int start = counter*L;
 	static char *seg = (char*) malloc(L+1);
 
 	if (start >= strlen(S)) {
-		seg='\0';
+		cout << "END" << "\n";
+		seg = (char *) "-";
 		return(&seg);
 	} 
 
 	strncpy(seg, S+start, L);
 	seg[L]='\0';
-	cout << xdrm->seg << " REQUESTED: " << seg << "\n";
+	cout << xdrm->seg << " START: " << start <<" REQUESTED: " << seg << "\n";
 	counter++;
 	return(&seg);
 }
 
 char **rpc_initverifyserver_1_svc(server_verifyxdr *xdrm, struct svc_req *s) {
-    static char *ptr = (char *)"Verify server initialzied"; /* must be static */
+    static char *ptr = (char *)"Verify server initialzied"; 
 	N = xdrm->N;
 	L = xdrm->L;
 	M = xdrm->M;
