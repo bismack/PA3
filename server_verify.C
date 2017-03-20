@@ -28,6 +28,11 @@ int counter=0;
 char S[] = {"abcaabcaabcaabcaabca"};
 
 char **rpc_getseg_1_svc(server_segment *xdrm, struct svc_req *s) {
+	if (xdrm->seg==-1) {
+		static char *seq = S;
+		return(&seq);
+	}
+
 	int start = counter*L;
 	static char *seg = (char*) malloc(L+1);
 

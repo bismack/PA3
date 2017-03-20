@@ -66,7 +66,6 @@ void RPC_InitAppendServer (int argc, char *argv[]) {
   }
 
   server_appendxdr xdrmessage;
-  
   xdrmessage.F = st.F;
   xdrmessage.L = st.L;
   xdrmessage.M = st.M;
@@ -156,7 +155,12 @@ void RPC_GetSeg() {
   #pragma omp parallel num_threads(st.N) reduction(+:isSatisfied)
   isSatisfied += checkSegmentProp();
 
-  cout << "---------SEGMENTS SATISFIED: " << isSatisfied << "\n";
+  string sresult;
+  server_segment xdrmessage;
+  xdrmessage.seg = -1;
+  sresult = rpc_getseg_1(&xdrmessage, c2)[0];
+
+  cout <<"---------STRING: " << sresult << " SEGMENTS SATISFIED: " << isSatisfied << "\n";
    // writeOutputFile();
 }
 
@@ -173,9 +177,9 @@ int main(int argc, char *argv[]) {
 
 
   RPC_InitVerifyServer(argc, argv);
-  RPC_InitAppendServer(argc, argv);
+  // RPC_InitAppendServer(argc, argv);
   RPC_GetSeg();
-  clnt_destroy(c1);
+  // clnt_destroy(c1);
   clnt_destroy(c2);
   exit(0);
   return(0);
