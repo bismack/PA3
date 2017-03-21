@@ -3,7 +3,7 @@
 #include <omp.h>
 #include <unistd.h>
 #include <algorithm>
-
+#include <fstream>
 #include <rpc/rpc.h>
 
 extern "C" {
@@ -16,22 +16,91 @@ CLIENT *c1;
 CLIENT *c2;
 
 struct INPUT {
-  int F,N,L,M;
+  int F, N, L, M;
   char c0, c1, c2;
 } st;
 
-
+int totalStringLength;
+int numOfSegmentsSatisfied = 0;
 bool static stringLengthMaxed = false;
 char alphabet[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+char S[] = {};
+
+// Return if the string can be built from inputs.
+int isPossible(int F, int N, int L) {
+  if (N > 3) {
+    return 1;
+  } else if (F == 0 && L%2 == 0) {
+    return 1;
+  } else if (F == 1 && L != 1) {
+    return 1;
+  } else if (F == 2) {
+    return 1;
+  } else if (F == 3 && L%2 == 0) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+void writeOutputFile() {
+   ofstream textFile;
+   textFile.open("out.txt");
+   textFile << S << endl;
+   textFile << numOfSegmentsSatisfied << endl;
+   textFile.close();
+}
+
+bool validateInput(int F, int N, int L, int M) {
+
+   bool isValid = true;
+
+   printf("Parsing input parameters... %i %i %i %i\n", F, N, L, M);
+
+   if (!(0 <= F and F <= 3) || !(3 <= N and N <= 8) || L<1 || M<1) {
+
+      printf("usage: ./pa1.x i N L M c0 c1 c2\n");
+      printf("where: \n");
+      printf("    i (0 <= i <= 3) is the index of the property Fi which each segment of S needs to satisfy; \n");
+      printf("    N (3 <= N <= 8) is the number of threads; \n");
+      printf("    L is the length of each segment of S;\n");
+      printf("    M (M divides N) is the number of segments in S to generate, and \n");
+      printf("    c0, c1, and c2 are the letters to be used in the property check.\n");
+
+      printf("\n");
+      printf("Please check input parameter F\n");
+      isValid = false;
+
+   }
+
+   return isValid;
+}
+
+void transferCompletedString(){
+  //Connnect to UDP
+  server_segment xdrmessage;
+  xdrmessage.seg = 3;
+  rpc_getseg_1(&xdrmessage, c2);
+
+  //Begin String Transfer
+  server_letter xdrmsg;
+  xdrmsg.letter = alphabet[3];
+  rpc_append_1(&xdrmsg, c1);
+
+  char **completedString;
+  completedString = rpc_getseg_1(&xdrmessage, c2);
+  cout << "SRESULT: " << &completedString << endl;
+}
 
 void update(server_letter xdrmessage, int thread_id) {
   if (*rpc_append_1(&xdrmessage, c1) == 0) {
     cout << thread_id << " : added" << endl;
   } else if (*rpc_append_1(&xdrmessage, c1) == -1) {
     stringLengthMaxed = true;
-    cout << "string has been completed" << endl;
+    cout << "STRING COMPLETE" << endl;
+    transferCompletedString();
   } else {
-    cout << "err" << endl;
+    cout << "UPDATE STRING: ERROR OCCURED" << endl;
   }
 }
 
@@ -45,8 +114,8 @@ void RPCAppend() {
       unsigned int microsleep = rand() % 500 + 100;
       usleep(microsleep);
       
+      #pragma omp critical
       if (!stringLengthMaxed) {
-        #pragma omp critical
         update(xdrmessage, thread_id);
       }
    }
@@ -89,7 +158,7 @@ void RPC_InitVerifyServer (int argc, char *argv[]) {
   server = argv[9];
 
   if ((c2 = clnt_create(server, VERIFY_PROG, VERIFY_VERS, "udp")) == NULL){
-       clnt_pcreateerror(server);
+    clnt_pcreateerror(server);
     exit(2);
   }
 
@@ -142,7 +211,7 @@ int checkSegmentProp() {
     sresult = rpc_getseg_1(&xdrmessage, c2)[0];
     if (sresult[0]=='-') 
       break; 
-    else if (verify(sresult)==true) 
+    else if (verify(sresult) == true) 
       isSatisfied++; 
 
     cout << "THREAD: " << thread_id << " SUBTR: " << sresult << " RESULT: " << isSatisfied << "\n";
@@ -161,7 +230,7 @@ void RPC_GetSeg() {
   sresult = rpc_getseg_1(&xdrmessage, c2)[0];
 
   cout <<"---------STRING: " << sresult << " SEGMENTS SATISFIED: " << isSatisfied << "\n";
-   // writeOutputFile();
+  writeOutputFile();
 }
 
 
@@ -175,12 +244,27 @@ int main(int argc, char *argv[]) {
   st.c1 = argv[6][0];
   st.c2 = argv[7][0];
 
+  if (!validateInput(st.F, st.N, st.L, st.M)) {
+    printf("Exiting program...\n");
+    return 0;
+  }
+
+  if (!isPossible(st.F, st.N, st.L)) {
+    printf("Segments of length L and alphabet size N are not capable of satisfying property F.\n Please select different parameters.\n");
+    return 0;
+  }
+  
+  totalStringLength = st.M * st.L;
+
+  //generates a seed of pseudo-random numbers
+  srand(time(0));
 
   RPC_InitVerifyServer(argc, argv);
-  // RPC_InitAppendServer(argc, argv);
+  RPC_InitAppendServer(argc, argv);
   RPC_GetSeg();
-  // clnt_destroy(c1);
+  clnt_destroy(c1);
   clnt_destroy(c2);
   exit(0);
+
   return(0);
 }

@@ -2,10 +2,7 @@
 #include <string.h>
 #include <rpc/rpc.h>        //* standard RPC include file */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-
+#include <stdlib.h>
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
@@ -14,6 +11,10 @@
 #include <sys/wait.h>
 #include <netdb.h>
 #include <unistd.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 #define PORT   1976
 #define BUFLEN 2076
@@ -25,28 +26,87 @@ using namespace std;
 
 int N, L, M;
 int counter=0;
-char S[] = {"abcaabcaabcaabcaabca"};
+bool isConnectedToUDP = false;
+bool stringReceived = false;
+size_t totalStringLength;  
+
+int createdSocket = 0;
+int bytesReceived = 0;
+char receiveBuffer[256];
+char S[] = {};
+
+void connectToUDP(){
+	cout << "ATTEMPTING TO CONNECT VIA UDP" << endl;
+	memset(receiveBuffer, '0', sizeof(receiveBuffer));
+	struct sockaddr_in serv_addr;
+
+	/* Create a socket first */
+    if ((createdSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        cout << "ERROR CREATING SOCKET" << endl;
+    } else{
+    	cout << "SOCKET CREATED SUCCESSFULLY" << endl;
+    }
+
+    /* Initialize sockaddr_in data structure */
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(5000); // port
+    serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    /* Attempt a connection */
+    if (connect(createdSocket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
+    	cout << "ERROR CONNECTING TO SOCKET" << endl;
+    } else isConnectedToUDP = true;
+}
+
+char *receiveViaUDP(){
+	while ((bytesReceived = recv(createdSocket, receiveBuffer, 256, 0)) > 0) {
+        printf("Bytes received %d\n", bytesReceived);    
+        printf("%s \n", receiveBuffer);
+        strncpy(S, receiveBuffer, totalStringLength);
+        cout << "STRING: " << S << endl;
+    }
+
+    if (strlen(S) == totalStringLength) {
+    	stringReceived = true;
+        cout << "STRING: " << S << " - TRANSFERRED SUCCESSFULLY" << endl;
+    } 
+
+    return S;
+}
 
 char **rpc_getseg_1_svc(server_segment *xdrm, struct svc_req *s) {
-	if (xdrm->seg==-1) {
-		static char *seq = S;
-		return(&seq);
-	}
-
-	int start = counter*L;
 	static char *seg = (char*) malloc(L+1);
 
-	if (start >= strlen(S)) {
-		cout << "END" << "\n";
-		seg = (char *) "-";
-		return(&seg);
-	} 
+	if (!isConnectedToUDP) {
+		connectToUDP();
+        return(NULL);
 
-	strncpy(seg, S+start, L);
-	seg[L]='\0';
-	cout << xdrm->seg << " START: " << start <<" REQUESTED: " << seg << "\n";
-	counter++;
-	return(&seg);
+	} else {
+		if (!stringReceived) {
+			seg = receiveViaUDP();
+			return(&seg);
+		} else {
+			if (xdrm->seg == -1) {
+				static char *seq = S;
+				return(&seq);
+			}
+
+			size_t start = counter * L;
+
+			if (start >= sizeof(S)) {
+				cout << "END" << "\n";
+				seg = (char *) "-";
+				return(&seg);
+			} 
+
+			strncpy(seg, S+start, L);
+			seg[L]='\0';
+			cout << xdrm->seg << " START: " << start <<" REQUESTED: " << seg << "\n";
+			counter++;
+			return(&seg);
+		}
+	}
+	return NULL;
 }
 
 char **rpc_initverifyserver_1_svc(server_verifyxdr *xdrm, struct svc_req *s) {
@@ -54,58 +114,8 @@ char **rpc_initverifyserver_1_svc(server_verifyxdr *xdrm, struct svc_req *s) {
 	N = xdrm->N;
 	L = xdrm->L;
 	M = xdrm->M;
-    // cout << "Message from client: "<< xdrm->string_arg << "\n";
-     
-//     struct sockaddr_in si_me, si_other;
-    
-//     int soc;
-//     char rcvBuf[BUFLEN];
-//     char sndBuf[BUFLEN];
-//     char strIP[BUFLEN];
-//     char myStr[BUFLEN];
-//     int slen = sizeof(si_other);
-    
-//     soc = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-//     if (soc == -1){
-//         exit(0);
-//     }
-//     else
-//         printf("UDP Socket created successfully.\n");
-    
-//     memset((char *) &si_me, 0, sizeof(si_me));
-//     si_me.sin_family = AF_INET;
-//     si_me.sin_port = htons(PORT);
-//     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    
-//     int retVal = bind(soc, (struct sockaddr*)&si_me, sizeof(si_me));
-//     if (retVal == -1){
-//         exit(0);
-//     }
-//     else
-//         printf("UDP Socket bound successfully.\n");
-    
-//     while (1)
-//     {
-//         printf("Waiting to receive a message...\n");
-//         retVal = recvfrom(soc, rcvBuf, BUFLEN, 0, (struct sockaddr *)&si_other, (socklen_t*)&slen);
-//         if (retVal == -1){
-//             exit(0);
-//         }
-        
-//         printf("Received packet from %s:%d\nMessage: %s\n\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port), rcvBuf);
-        
-// /*        gets(myStr);
-//         int len = sprintf(sndBuf, "%s\n%s", rcvBuf, myStr);
-        
-//         gets(strIP);
-//         si_other.sin_port = htons(PORT);
-//         inet_aton(strIP, &si_other.sin_addr);
-        
-//         sendto(soc, sndBuf, len, 0, (struct sockaddr *)&si_other, slen);
-// */
-//          }
-    
-//     close(soc);
-     
+
+	totalStringLength = M * L;
+
     return(&ptr);
 }
