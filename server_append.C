@@ -52,7 +52,6 @@ void setupUDP() {
 void transferViaUDP() {
   cout << "INSIDE UDP ACCEPT" << endl;
   while(1) {
-
     connectedSocket = accept(listenSocket, (struct sockaddr*) NULL, NULL);
     size_t messageLength = S.length();
 

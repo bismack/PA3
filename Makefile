@@ -41,4 +41,4 @@ prog.x: new
 new:
 
 clean:
-	rm *.o *.c client server_append server_verify server_appendxdr.h server_verifyxdr.h
+	rm *.o *.c client server_append server_verify server_appendxdr.h server_verifyxdr.h out.txt

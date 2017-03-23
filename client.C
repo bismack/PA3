@@ -24,7 +24,6 @@ int totalStringLength;
 int numOfSegmentsSatisfied = 0;
 bool static stringLengthMaxed = false;
 char alphabet[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
-char S[] = {};
 
 // Return if the string can be built from inputs.
 int isPossible(int F, int N, int L) {
@@ -43,7 +42,7 @@ int isPossible(int F, int N, int L) {
   }
 }
 
-void writeOutputFile() {
+void writeOutputFile(string S) {
    ofstream textFile;
    textFile.open("out.txt");
    textFile << S << endl;
@@ -87,9 +86,9 @@ void transferCompletedString(){
   xdrmsg.letter = alphabet[3];
   rpc_append_1(&xdrmsg, c1);
 
-  char **completedString;
-  completedString = rpc_getseg_1(&xdrmessage, c2);
-  cout << "SRESULT: " << &completedString << endl;
+  string completedString;
+  completedString = rpc_getseg_1(&xdrmessage, c2)[0];
+  cout << "SRESULT: " << completedString << endl;
 }
 
 void update(server_letter xdrmessage, int thread_id) {
@@ -98,7 +97,7 @@ void update(server_letter xdrmessage, int thread_id) {
   } else if (*rpc_append_1(&xdrmessage, c1) == -1) {
     stringLengthMaxed = true;
     cout << "STRING COMPLETE" << endl;
-    transferCompletedString();
+    // transferCompletedString();
   } else {
     cout << "UPDATE STRING: ERROR OCCURED" << endl;
   }
@@ -149,6 +148,7 @@ void RPC_InitAppendServer (int argc, char *argv[]) {
   
   #pragma omp parallel num_threads(st.N)
   RPCAppend();
+  // transferCompletedString();
 }
 
 void RPC_InitVerifyServer (int argc, char *argv[]) {
@@ -221,6 +221,7 @@ int checkSegmentProp() {
 
 void RPC_GetSeg() {
   int isSatisfied=0;
+
   #pragma omp parallel num_threads(st.N) reduction(+:isSatisfied)
   isSatisfied += checkSegmentProp();
 
@@ -230,7 +231,7 @@ void RPC_GetSeg() {
   sresult = rpc_getseg_1(&xdrmessage, c2)[0];
 
   cout <<"---------STRING: " << sresult << " SEGMENTS SATISFIED: " << isSatisfied << "\n";
-  writeOutputFile();
+  writeOutputFile(sresult);
 }
 
 
@@ -261,6 +262,7 @@ int main(int argc, char *argv[]) {
 
   RPC_InitVerifyServer(argc, argv);
   RPC_InitAppendServer(argc, argv);
+  transferCompletedString();
   RPC_GetSeg();
   clnt_destroy(c1);
   clnt_destroy(c2);

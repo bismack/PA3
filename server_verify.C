@@ -16,7 +16,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define PORT   1976
+#define PORT   5000
 #define BUFLEN 2076
 
 extern "C"{
@@ -33,7 +33,7 @@ size_t totalStringLength;
 int createdSocket = 0;
 int bytesReceived = 0;
 char receiveBuffer[256];
-char S[] = {};
+static char S[] = {};
 
 void connectToUDP(){
 	cout << "ATTEMPTING TO CONNECT VIA UDP" << endl;
@@ -59,6 +59,11 @@ void connectToUDP(){
 }
 
 char *receiveViaUDP(){
+	if (strlen(S) == totalStringLength) {
+    	stringReceived = true;
+        cout << "STRING: " << S << " - TRANSFERRED SUCCESSFULLY" << endl;
+    } 
+
 	while ((bytesReceived = recv(createdSocket, receiveBuffer, 256, 0)) > 0) {
         printf("Bytes received %d\n", bytesReceived);    
         printf("%s \n", receiveBuffer);
@@ -66,10 +71,6 @@ char *receiveViaUDP(){
         cout << "STRING: " << S << endl;
     }
 
-    if (strlen(S) == totalStringLength) {
-    	stringReceived = true;
-        cout << "STRING: " << S << " - TRANSFERRED SUCCESSFULLY" << endl;
-    } 
 
     return S;
 }
@@ -79,10 +80,11 @@ char **rpc_getseg_1_svc(server_segment *xdrm, struct svc_req *s) {
 
 	if (!isConnectedToUDP) {
 		connectToUDP();
-        return(NULL);
-
-	} else {
-		if (!stringReceived) {
+		cout << "CONNECTING TO UDP" << "\n";
+        //return(NULL);
+	} //else 
+	if (!stringReceived) {
+			cout << "RECIEVING STRING: " << S << " of length: " << strlen(S) << "\n";
 			seg = receiveViaUDP();
 			return(&seg);
 		} else {
@@ -93,7 +95,7 @@ char **rpc_getseg_1_svc(server_segment *xdrm, struct svc_req *s) {
 
 			size_t start = counter * L;
 
-			if (start >= sizeof(S)) {
+			if (start >= strlen(S)) {
 				cout << "END" << "\n";
 				seg = (char *) "-";
 				return(&seg);
@@ -105,7 +107,7 @@ char **rpc_getseg_1_svc(server_segment *xdrm, struct svc_req *s) {
 			counter++;
 			return(&seg);
 		}
-	}
+	
 	return NULL;
 }
 
